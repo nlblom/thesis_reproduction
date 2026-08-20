@@ -1,37 +1,37 @@
 # High-Dimensional Bayesian Forecast Combination via Sparse Precision Estimation
 
 MSc thesis reproduction package. Extends Winkler (1981) forecast combination
-by replacing the Inverse-Wishart prior on the covariance matrix with a
+by replacing the Inverted Wishart prior on the covariance matrix with a
 Bayesian graphical lasso prior on the precision matrix (Wang, 2012).
 
 ## Structure
 
 ```
 thesis_reproduction/
-├── thesis_reproduction.Rproj
-├── README.md                       (this file)
-├── data/
-│   ├── raw/                        second_edit.csv, Actual_gdpgrowth_data_upd.xlsx
-│   ├── yhat.csv, forERR.csv, ytrue.csv   (cleaned, ready to use)
-│   └── README_data_pipeline.txt    how to regenerate from raw ECB SPF data
-├── shared/
-│   ├── joint_gibbs.R                BFGL joint Gibbs sampler
-│   ├── mgps_gibbs.R                 shared helper functions
-│   └── plot_style.R                 shared ggplot theme + colour palette
-├── simulation/
-│   ├── sim_generalizations_mse.R          Chapter 3 grid + bias robustness (Parts 1-9)
-│   ├── check_burnin_diagnostics_sim.R     burn-in trace plots for the simulation grid
-│   └── results/
-└── empirical/
-    ├── spf_clean.R                               raw data -> yhat/forERR/ytrue.csv
-    ├── helpers_empirical.R                       shared Winkler/MC-integration/EWMA functions
-    ├── empirical_spf_gdp.R                       Chapter 4 main empirical results
-    ├── ewma_delta_sensitivity.R                  Chapter 4 EWMA robustness check
-    ├── kmax_sensitivity.R                        Chapter 4 k_max robustness check (BFGL)
-    ├── spf_adaptive_gl_actuals_vs_forecast.R     Fig: Adaptive GL forecast vs actual (R=50)
-    ├── spf_data_panel_circles.R                  Fig: forecaster panel vs actual GDP growth
-    ├── check_burnin_diagnostics.R                appendix burn-in trace plots
-    └── results/
+  thesis_reproduction.Rproj
+  README.md                       (this file)
+  data/
+    raw/                        second_edit.csv, Actual_gdpgrowth_data_upd.xlsx
+    yhat.csv, forERR.csv, ytrue.csv   (cleaned, ready to use)
+    README_data_pipeline.txt    how to regenerate from raw ECB SPF data
+  shared/
+    joint_gibbs.R                BFGL joint Gibbs sampler
+    mgps_gibbs.R                 shared helper functions
+    plot_style.R                 shared ggplot theme + colour palette
+  simulation/
+    sim_generalizations_mse.R          Chapter 3 grid + bias robustness (Parts 1-9)
+    check_burnin_diagnostics_sim.R     burn-in trace plots for the simulation grid
+    results/
+  empirical/
+    spf_clean.R                               raw data -> yhat/forERR/ytrue.csv
+    helpers_empirical.R                       shared Winkler/MC-integration/EWMA functions
+    empirical_spf_gdp.R                       Chapter 4 main empirical results
+    ewma_delta_sensitivity.R                  Chapter 4 EWMA robustness check
+    kmax_sensitivity.R                        Chapter 4 k_max robustness check (BFGL)
+    spf_adaptive_gl_actuals_vs_forecast.R     Fig: Adaptive GL forecast vs actual (R=50)
+    spf_data_panel_circles.R                  Fig: forecaster panel vs actual GDP growth
+    check_burnin_diagnostics.R                appendix burn-in trace plots
+    results/
 ```
 
 ## Setup
