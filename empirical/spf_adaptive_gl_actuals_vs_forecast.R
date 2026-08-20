@@ -1,10 +1,8 @@
-# =============================================================================
-# ADAPTIVE GL: ACTUALS VS FORECAST (R = 50)
-# =============================================================================
+# Adaptive GL: actuals vs forecast (R = 50)
+#
 # Standalone - does not touch empirical_spf_gdp.R or its saved results.
 # Reuses the Method 4 block's conventions: raw (no bias correction), same
 # seeding (base_seed + i), same burn-in/draws.
-# =============================================================================
 
 library(abglasso)
 library(ggplot2)

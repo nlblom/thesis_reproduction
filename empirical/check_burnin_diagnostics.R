@@ -1,6 +1,5 @@
-# =============================================================================
-# BURN-IN DIAGNOSTICS: one overlaid trace plot per method, 3 windows each
-# =============================================================================
+# Burn-in diagnostics: one overlaid trace plot per method, 3 windows each
+#
 # Bayes GL / EWMA-GL / BFGL use burn_in_gl = 1500 (raised from 500 after
 # diagnostics showed drift in windows overlapping the COVID-era GDP shock).
 # Adaptive GL uses burn_in_adaptive = 1000, unchanged - confirmed clean in
@@ -9,11 +8,9 @@
 # 4 plots, one per method, each overlaying 3 windows:
 #   - R60_early:     typical case, no COVID overlap
 #   - R60_late:      the case that motivated the burn-in increase
-#   - R60_covid_mid: mid-sample COVID overlap, isolates "window overlaps
-#                    COVID" from "is the last window" as the driver
+#   - R60_covid_mid: mid-sample COVID overlap
 #
 # Standalone test script - does not modify empirical_spf_gdp.R.
-# =============================================================================
 
 library(MASS)
 library(BayesianGLasso)
@@ -24,7 +21,8 @@ source(here("shared", "mgps_gibbs.R"))
 source(here("shared", "joint_gibbs.R"))
 source(here("empirical", "helpers_empirical.R"))
 
-set.seed(20260721)  # same seed as empirical_spf_gdp.R for comparability
+# same seed as empirical_spf_gdp.R for comparability
+set.seed(20260721)
 
 yhat   <- as.matrix(read.csv(here("data", "yhat.csv"),   row.names = 1))
 errors <- as.matrix(read.csv(here("data", "forERR.csv"), row.names = 1))
@@ -33,20 +31,22 @@ p      <- ncol(yhat)
 
 n_bayes_draws <- 1000
 
-# Burn-in set per sampler family - see header comment for rationale.
-burn_in_gl       <- 1500   # Bayes GL, EWMA-GL, BFGL
-burn_in_adaptive <- 1000   # Adaptive GL (unchanged)
+# Burn-in set per sampler family
+# Bayes GL, EWMA-GL, BFGL
+burn_in_gl       <- 1500
+# Adaptive GL (unchanged)
+burn_in_adaptive <- 1000
 delta_ewma       <- 0.97
 
-extra_check <- 1000  # comfortable buffer past burn-in, enough to confirm a flat band
+# comfortable buffer past burn-in, enough to confirm a flat band
+extra_check <- 1000
 
-# -----------------------------------------------------------------------
-# PART 1: the three windows
-# -----------------------------------------------------------------------
+# Part 1: the three windows
 
 get_E_win <- function(R, t) {
   t_win <- (t - R):(t - 1)
-  errors[t_win, ] * 100   # same pp-rescaling as empirical_spf_gdp.R
+  # same pp-rescaling as empirical_spf_gdp.R
+  errors[t_win, ] * 100
 }
 
 windows_to_check <- list(
@@ -58,11 +58,7 @@ windows_to_check <- list(
 source(here("shared", "plot_style.R"))
 window_colors <- window_colors_trace
 
-# -----------------------------------------------------------------------
-# PART 2: inefficiency factor (Wang 2012 definition), unchanged from
-# before - still reported to console/RDS even though we're not plotting
-# the k-trace here.
-# -----------------------------------------------------------------------
+# Part 2: inefficiency factor (Wang 2012 definition)
 
 inefficiency_factor <- function(chain, max_lag = NULL) {
   n <- length(chain)
@@ -81,11 +77,9 @@ summarize_inefficiency <- function(omega_draws) {
   list(median = median(factors), max = max(factors))
 }
 
-# -----------------------------------------------------------------------
-# PART 3: per-method chain runners - return traces instead of plotting
+# Part 3: per-method chain runners - return traces instead of plotting
 # directly, so all three windows' traces can be overlaid in one figure
 # per method afterward.
-# -----------------------------------------------------------------------
 
 run_blockGLasso_family <- function(X, burn_in_used) {
   total_iter <- burn_in_used + extra_check + n_bayes_draws
@@ -119,7 +113,7 @@ run_BFGL <- function(X, burn_in_used) {
   omega_full <- lapply(seq_len(dim(fit$Omega)[3]), function(m) fit$Omega[, , m])
   post_burn  <- omega_full[-(1:burn_in_used)]
   # k is still tracked and reported to console (useful sanity check) but
-  # deliberately not plotted here - that's the k_max cap sweep's job.
+  # deliberately not plotted here
   k_trace     <- fit$k_trace[-1]
   k_post_burn <- k_trace[-(1:burn_in_used)]
   list(
@@ -131,15 +125,13 @@ run_BFGL <- function(X, burn_in_used) {
   )
 }
 
-# -----------------------------------------------------------------------
-# PART 4: run all three windows for all four methods, collecting traces
-# -----------------------------------------------------------------------
+# Part 4: run all three windows for all four methods, collecting traces
 
 results <- list(bayes_gl = list(), adaptive_gl = list(), ewma_gl = list(), bfgl = list())
 
 for (w in windows_to_check) {
   E_win <- get_E_win(w$R, w$t)
-  cat(sprintf("\n--- window %s (R=%d, t=%d) ---\n", w$label, w$R, w$t))
+  cat(sprintf("\nwindow %s (R=%d, t=%d)\n", w$label, w$R, w$t))
 
   cat("Bayes GL:\n")
   results$bayes_gl[[w$label]] <- run_blockGLasso_family(E_win, burn_in_gl)
@@ -152,7 +144,8 @@ for (w in windows_to_check) {
               results$adaptive_gl[[w$label]]$ineff$median, results$adaptive_gl[[w$label]]$ineff$max))
 
   cat("EWMA-GL:\n")
-  S_ewma  <- ewma_cov(E_win, delta = delta_ewma)   # already scaled by R (see helpers_empirical.R)
+  # already scaled by R (see helpers_empirical.R)
+  S_ewma  <- ewma_cov(E_win, delta = delta_ewma)
   L       <- chol(S_ewma)
   X_synth <- rbind(L, matrix(0, w$R - p, p))
   results$ewma_gl[[w$label]] <- run_blockGLasso_family(X_synth, burn_in_gl)
@@ -166,13 +159,8 @@ for (w in windows_to_check) {
               results$bfgl[[w$label]]$k_median, results$bfgl[[w$label]]$k_max))
 }
 
-# -----------------------------------------------------------------------
-# PART 5: one overlaid plot per method (4 total), 2 panels each
+# Part 5: one overlaid plot per method (4 total), 2 panels each
 # (Omega[1,1] and Omega[1,2]), all three windows on the same axes.
-# -----------------------------------------------------------------------
-
-# No in-plot titles - method name, burn-in value, and window definitions
-# go in the LaTeX caption, consistent with the ggplot figures elsewhere.
 plot_method <- function(method_results, method_label, burn_in_used, filename) {
   png(filename, width = 1000, height = 700, res = 150, family = "serif")
   par(mfrow = c(2, 1), family = "serif", cex.lab = 1, cex.axis = 0.9,
@@ -209,8 +197,6 @@ plot_method(results$adaptive_gl, "Adaptive GL", burn_in_adaptive, here("empirica
 plot_method(results$ewma_gl,     "EWMA-GL",     burn_in_gl,       here("empirical", "results", "trace_EWMAGL_combined.png"))
 plot_method(results$bfgl,        "BFGL",        burn_in_gl,       here("empirical", "results", "trace_BFGL_combined.png"))
 
-# -----------------------------------------------------------------------
-# PART 6
-# -----------------------------------------------------------------------
+# Part 6
+
 saveRDS(results, here("empirical", "results", "burnin_diagnostic_results_4plots.rds"))
-cat("\nDone. 4 combined plots written, results saved to burnin_diagnostic_results_4plots.rds\n")

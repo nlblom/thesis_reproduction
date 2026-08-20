@@ -1,10 +1,9 @@
-# =============================================================================
-# EMPIRICAL APPLICATION: ECB SPF GDP FORECASTS
-# =============================================================================
+# Empirical application: ECB SPF GDP forecasts
+#
 # Data:
-#   yhat.csv    -- T x p matrix of point forecasts (decimal, e.g. 0.02 = 2%)
-#   forERR.csv  -- T x p matrix of forecast errors  (decimal)
-#   ytrue.csv   -- T x 1 vector of actuals           (decimal)
+#   yhat.csv    - T x p matrix of point forecasts (decimal)
+#   forERR.csv  - T x p matrix of forecast errors  (decimal)
+#   ytrue.csv   - T x 1 vector of actuals           (decimal)
 #
 #   Source: ECB SPF, 1999Q3-2026Q1 (T=107 quarters, p=35 forecasters)
 #   Actuals: Eurostat namq_10_gdp, EA20, CLV_PCH_SM, SCA
@@ -20,18 +19,17 @@
 #                                  scores, and idiosyncratic precision)
 #
 # Evaluation metrics:
-#   MSFE ratio  -- relative to Sample Cov. Inverse (point forecast quality)
-#   Mean log score -- Gaussian predictive density (calibration)
+#   MSFE ratio  - relative to Sample Cov. Inverse (point forecast quality)
+#   Mean log score - Gaussian predictive density (calibration)
 #   Both metrics are reported with AND without the Palm & Zellner bias
 #   correction below (see "Bias correction" note), reusing the same
 #   posterior draws for both, so this costs no extra sampling.
 #
 # All Bayesian methods (2-6) use MC integration: loss computed per draw,
-# then averaged (not averaging Omega first). Same as sim_generalizations_mse.R Part 1.
+# then averaged (not averaging Omega first).
 #
 # All forecast errors are rescaled to percentage points (* 100) before
 # any estimation. Actuals and forecasts are rescaled to match.
-# =============================================================================
 
 library(MASS)
 library(MCMCpack)
@@ -51,9 +49,7 @@ set.seed(base_seed)
 source(here("shared", "mgps_gibbs.R"))
 source(here("shared", "joint_gibbs.R"))
 
-# =============================================================================
-# SECTION 1: LOAD AND VALIDATE DATA
-# =============================================================================
+# Section 1: load and validate data
 
 yhat   <- as.matrix(read.csv(here("data", "yhat.csv"),   row.names = 1))
 errors <- as.matrix(read.csv(here("data", "forERR.csv"), row.names = 1))
@@ -67,36 +63,28 @@ cat("Missing in yhat:  ", sum(is.na(yhat)),   "\n")
 cat("Missing in errors:", sum(is.na(errors)), "\n")
 stopifnot(nrow(errors) == T_full, ncol(errors) == p)
 stopifnot(length(ytrue) == T_full)
-cat("Data validation passed.\n\n")
 
-# =============================================================================
-# SECTION 2: HELPER FUNCTIONS
-# =============================================================================
+# Section 2: helper functions
 # Shared with ewma_delta_sensitivity.R - see helpers_empirical.R for
 # winkler_predictive(), mc_sfe(), mc_log_score(), ewma_cov(), etc.
 source(here("empirical", "helpers_empirical.R"))
 
-# =============================================================================
-# SECTION 3: ROLLING-WINDOW EVALUATION
-# =============================================================================
+# Section 3: rolling-window evaluation
 
-n_bayes_draws <- 1000     # posterior draws to keep
+# posterior draws to keep
+n_bayes_draws <- 1000
 
-# Burn-in set per sampler family. blockGLasso/joint_gibbs (Bayes GL, EWMA,
-# BFGL) need 1500, raised from 500 after diagnostics (check_burnin_diagnostics.R)
-# found windows overlapping the COVID GDP shock needed more mixing time.
-# BayesGlassoBlock (Adaptive GL) converged cleanly at 1000, unchanged.
-burn_in_gl       <- 1500  # Bayes GL, EWMA, BFGL
-burn_in_adaptive <- 1000  # Adaptive GL (unchanged)
+# Burn-in set per sampler family
+burn_in_gl       <- 1500
+burn_in_adaptive <- 1000
 
-# EWMA decay: ~5-6 year half-life (business-cycle length), not Koop &
-# Korobilis' (2012) delta = 0.99. Half-life: delta = 0.5^(1/h).
+# EWMA decay: ~5-6 year half-life (business-cycle length)
 delta_ewma    <- 0.97
 
-R_grid <- c(50, 60, 70)   # rolling window sizes to evaluate
+# rolling window sizes to evaluate
+R_grid <- c(50, 60, 70)
 
-# Half-life / effective-window table - computed from the
-# live parameters so it can't drift if delta_ewma or R_grid change.
+# Half-life / effective-window table
 ewma_justification <- data.frame(
   R                = R_grid,
   delta            = delta_ewma,
@@ -148,18 +136,15 @@ for (R in R_grid) {
   k_summary <- matrix(NA, nrow = n_test, ncol = 3,
                       dimnames = list(NULL, c("k_median", "k_max_reached", "hit_cap")))
 
-  # ---------------------------------------------------------------------------
   # Main rolling loop
-  # ---------------------------------------------------------------------------
 
   for (i in seq_along(test_idx)) {
 
   t     <- test_idx[i]
-  t_win <- (t - R):(t - 1)    # indices of estimation window
+  # indices of estimation window
+  t_win <- (t - R):(t - 1)
 
   # Rescale to percentage points for numerical stability.
-  # Wang (2012) sampler is sensitive to scale; pp-scale gives
-  # entries O(1) rather than O(10^{-4}).
   E_win <- errors[t_win, ] * 100
   y_t   <- ytrue[t]    * 100
   f_t   <- yhat[t, ]   * 100
@@ -173,10 +158,8 @@ for (R in R_grid) {
     cat("Period", i, "/", n_test, "(t =", t, ")\n")
   }
 
-  # ------------------------------------------------------------------
-  # METHOD 1: Sample covariance inverse (no posterior - genuine plug-in,
-  # same single-evaluation treatment as Method 1 in the simulation)
-  # ------------------------------------------------------------------
+  # Method 1: sample covariance inverse
+
   S_win   <- cov(E_win)
   Omega_s <- tryCatch(solve(S_win), error = function(e) NULL)
 
@@ -192,12 +175,9 @@ for (R in R_grid) {
     pit_mat[i, "Sample Cov."] <- pit_gaussian(y_t, pred_s_raw$mu, pred_s_raw$sigma2)
   }
 
-  # ------------------------------------------------------------------
-  # METHOD 2: Inverse-Wishart posterior
-  # Prior IW(I_p, p+1) => Omega ~ Wishart(nu_post, Psi_post^{-1}); draw M
-  # times from this conjugate posterior (rwish), loss per draw as in 3-6.
-  # ------------------------------------------------------------------
-  set.seed(base_seed + i)   # isolates this method's draws from every other method's
+  # Method 2: Inverted Wishart posterior
+
+  set.seed(base_seed + i)
   Psi_post  <- diag(p) + crossprod(E_win)
   nu_post   <- (p + 1) + R
   Psi_inv   <- tryCatch(solve(Psi_post), error = function(e) NULL)
@@ -213,13 +193,12 @@ for (R in R_grid) {
     ls_mat_raw[i,  "Inv-Wishart"] <- mc_log_score(omega_draws_iw, f_t, y_t)
   }
 
-  # ------------------------------------------------------------------
-  # METHOD 3: Bayesian Graphical Lasso (Wang 2012)
+  # Method 3: Bayesian Graphical Lasso (Wang 2012)
   # blockGLasso() takes the raw data matrix X (T x p), forms crossprod(X)
   # internally.
-  # ------------------------------------------------------------------
+
   tryCatch({
-    set.seed(base_seed + i)   # isolates this method's draws from every other method's
+    set.seed(base_seed + i)
     bgl_fit     <- blockGLasso(E_win,
                                 iterations = n_bayes_draws,
                                 burnIn     = burn_in_gl,
@@ -240,13 +219,11 @@ for (R in R_grid) {
     cat("  [Bayes GL error at t =", t, "]:", conditionMessage(e), "\n")
   })
 
-  # ------------------------------------------------------------------
-  # METHOD 4: Adaptive Bayesian Graphical Lasso (Wang 2012)
-  #
+  # Method 4: Adaptive Bayesian Graphical Lasso (Wang 2012)
   # BayesGlassoBlock() returns Omega as a p x p x nmc array.
-  # ------------------------------------------------------------------
+
   tryCatch({
-    set.seed(base_seed + i)   # isolates this method's draws from every other method's
+    set.seed(base_seed + i)
     abgl_fit    <- BayesGlassoBlock(E_win,
                                     burnin = burn_in_adaptive,
                                     nmc    = n_bayes_draws)
@@ -268,18 +245,18 @@ for (R in R_grid) {
     cat("  [Adaptive GL error at t =", t, "]:", conditionMessage(e), "\n")
   })
 
-  # ------------------------------------------------------------------
-  # METHOD 5: EWMA-discounted Bayesian GL (delta = 0.97, Section 3.2 -
+  # Method 5: EWMA-discounted Bayesian GL (delta = 0.97, Section 2.4 -
   # not Koop & Korobilis' 2012 delta = 0.99)
   # blockGLasso() needs a data matrix X with t(X)%*%X = S_ewma; recovered
   # via Cholesky, zero-padded to keep nrow(X) = ess_int, the effective
   # sample size under discounting (Kish's ESS)
-  # ------------------------------------------------------------------
+
   tryCatch({
-    set.seed(base_seed + i)   # isolates this method's draws from every other method's
+    set.seed(base_seed + i)
     ess     <- effective_window(delta_ewma, R)
     ess_int <- max(p + 1, round(ess))
-    S_ewma  <- ewma_cov(E_win, delta = delta_ewma, scale = ess_int)   # scaled by ESS, not R
+    # scaled by ESS, not R
+    S_ewma  <- ewma_cov(E_win, delta = delta_ewma, scale = ess_int)
     L       <- chol(S_ewma)
     X_synth <- rbind(L, matrix(0, ess_int - p, p))
 
@@ -299,19 +276,16 @@ for (R in R_grid) {
     cat("  [EWMA error at t =", t, "]:", conditionMessage(e), "\n")
   })
 
-  # ------------------------------------------------------------------
-  # METHOD 6: Bayesian Factor Graphical Lasso (BFGL)
+  # Method 6: Bayesian Factor Graphical Lasso (BFGL)
   # joint_gibbs() updates factor loadings, scores, and idiosyncratic
   # precision in one sampler. k_init = 5;
   # k adapts via birth/death. $Omega is already the precision of E_win
   # (Woodbury applied internally per draw).
   #
-  # k_max = 10: birth/death inflates k under misspecification (see
-  # sim_generalizations_mse.R) rather than reflecting genuine factor
-  # structure.
-  # ------------------------------------------------------------------
+  # k_max = 10 as explained in the thesis.
+
   tryCatch({
-    set.seed(base_seed + i)   # isolates this method's draws from every other method's
+    set.seed(base_seed + i)
     k_init    <- 5
     joint_fit <- joint_gibbs(E_win, k_init = k_init,
                              nrun = n_bayes_draws + burn_in_gl, burn = burn_in_gl,
@@ -327,7 +301,6 @@ for (R in R_grid) {
     sfe_mat_raw[i, "BFGL"] <- mc_sfe(omega_list_bfgl, f_t, y_t)
     ls_mat_raw[i,  "BFGL"] <- mc_log_score(omega_list_bfgl, f_t, y_t)
 
-    # k_trace[1] is pre-iteration-1, so post-burn-in is k_trace[(burn_in_gl+2):(nrun+1)]
     k_post_burn <- joint_fit$k_trace[(burn_in_gl + 2):(n_bayes_draws + burn_in_gl + 1)]
     k_summary[i, "k_median"]      <- median(k_post_burn)
     k_summary[i, "k_max_reached"] <- max(k_post_burn)
@@ -337,10 +310,8 @@ for (R in R_grid) {
     cat("  [BFGL error at t =", t, "]:", conditionMessage(e), "\n")
   })
 
-  # ------------------------------------------------------------------
-  # Checkpoint: save after every 10 periods. Written to a dedicated
-  # "checkpoints" subfolder, not "results".
-  # ------------------------------------------------------------------
+  # Checkpoint: save after every 10 periods.
+
   if (i %% 10 == 0) {
     dir.create(here("empirical", "checkpoints"), showWarnings = FALSE)
     saveRDS(list(sfe_mat = sfe_mat, ls_mat = ls_mat, pit_mat = pit_mat,
@@ -350,11 +321,9 @@ for (R in R_grid) {
     cat("  [Checkpoint saved at i =", i, "]\n")
   }
 
-} # end rolling loop
+}
 
-# =============================================================================
-# SECTION 4: SUMMARISE RESULTS
-# =============================================================================
+# Section 4: summarise results
 
 msfe      <- colMeans(sfe_mat, na.rm = TRUE)
 mean_ls   <- colMeans(ls_mat,  na.rm = TRUE)
@@ -372,7 +341,6 @@ msfe_ratio_raw <- msfe_raw / msfe_raw["Sample Cov."]
 # Positive = bias correction helped.
 bias_effect_pct <- 100 * (msfe_raw - msfe) / msfe_raw
 
-cat("\n========================================\n")
 cat("MSFE, bias-corrected (R =", R, "):\n")
 print(round(msfe, 4))
 
@@ -399,7 +367,6 @@ cat("  Median of per-window posterior median k:", median(k_summary[, "k_median"]
 cat("  Median of per-window posterior max k:   ", median(k_summary[, "k_max_reached"], na.rm = TRUE), "\n")
 cat("  Windows where the k_max = 10 cap was reached:",
     sum(k_summary[, "hit_cap"], na.rm = TRUE), "/", sum(!is.na(k_summary[, "hit_cap"])), "\n")
-cat("========================================\n\n")
 
 # Save final results
 results <- list(
@@ -440,18 +407,16 @@ plot_data[[as.character(R)]] <- list(
   methods        = methods
 )
 
-} # end R_grid loop
+}
 
-# =============================================================================
-# SECTION 5: PLOTS (faceted across R - one figure per metric, not per R)
-# =============================================================================
+# Section 5: plots (faceted across R - one figure per metric, not per R)
 
 source(here("shared", "plot_style.R"))
 
 R_labels    <- paste0("R = ", R_grid)
 to_R_label  <- function(R) factor(paste0("R = ", R), levels = R_labels)
 
-# --- Plot 1: MSFE ratio bar chart, faceted by R ---
+# Plot 1: MSFE ratio bar chart, faceted by R
 df_msfe <- do.call(rbind, lapply(R_grid, function(R) {
   r <- plot_data[[as.character(R)]]
   data.frame(R = to_R_label(R), Method = factor(names(r$msfe_ratio), levels = r$methods),
@@ -471,7 +436,7 @@ p1 <- ggplot(df_msfe, aes(x = Method, y = Ratio, fill = Method)) +
         axis.title   = element_text(size = 16),
         strip.text   = element_text(size = 13))
 
-# --- Plot 2: Mean log score bar chart, faceted by R ---
+# Plot 2: mean log score bar chart, faceted by R
 df_ls <- do.call(rbind, lapply(R_grid, function(R) {
   r <- plot_data[[as.character(R)]]
   data.frame(R = to_R_label(R), Method = factor(names(r$mean_ls), levels = r$methods),
@@ -490,7 +455,7 @@ p2 <- ggplot(df_ls, aes(x = Method, y = MeanLS, fill = Method)) +
         axis.title   = element_text(size = 16),
         strip.text   = element_text(size = 13))
 
-# --- Plot 3: Cumulative SFE difference (EWMA vs Bayes GL), faceted by R ---
+# Plot 3: cumulative SFE difference (EWMA vs Bayes GL), faceted by R
 df_cum <- do.call(rbind, lapply(R_grid, function(R) {
   r <- plot_data[[as.character(R)]]
   cum_diff <- cumsum(r$sfe_mat[, "EWMA"] - r$sfe_mat[, "Bayes GL"]) / 10000
@@ -512,7 +477,7 @@ ggsave(here("empirical", "results", "spf_msfe_all_R.png"),    plot = p1, width =
 ggsave(here("empirical", "results", "spf_ls_all_R.png"),      plot = p2, width = 9, height = 5.5, dpi = 300)
 ggsave(here("empirical", "results", "spf_cumdiff_all_R.png"), plot = p3, width = 9, height = 5,   dpi = 300)
 
-# --- Plot 4: Bias-corrected vs raw MSFE ratio, grouped by method, faceted by R ---
+# Plot 4: bias-corrected vs raw MSFE ratio, grouped by method, faceted by R
 df_compare <- do.call(rbind, lapply(R_grid, function(R) {
   r <- plot_data[[as.character(R)]]
   data.frame(
@@ -541,7 +506,7 @@ p4 <- ggplot(df_compare, aes(x = Method, y = Ratio, fill = Version)) +
 print(p4)
 ggsave(here("empirical", "results", "spf_bias_effect_all_R.png"), plot = p4, width = 9, height = 5.5, dpi = 300)
 
-# --- Plot 5: PIT histograms, 3 headline methods x R, faceted grid ---
+# Plot 5: PIT histograms, 3 headline methods x R, faceted grid
 pit_methods <- c("Sample Cov.", "Adaptive GL", "BFGL")
 
 df_pit <- do.call(rbind, lapply(R_grid, function(R) {
@@ -566,5 +531,3 @@ p5 <- ggplot(df_pit, aes(x = u, y = after_stat(density))) +
 
 print(p5)
 ggsave(here("empirical", "results", "spf_pit_hist.png"), plot = p5, width = 9, height = 7, dpi = 300)
-
-cat("Plots saved (faceted across R = 50/60/70): 5 files.\n")

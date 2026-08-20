@@ -1,10 +1,8 @@
-# =============================================================================
-# DATA SECTION: PANEL FORECASTS (CIRCLES) VS ACTUAL GDP GROWTH
-# =============================================================================
+# Data panel: panel forecasts (circles) vs actual GDP growth
+#
 # Standalone - reads the same yhat.csv / ytrue.csv used throughout, no fitting.
 # Matches Lee & Seregina's Fig. 2 layout: each forecaster's point forecast as
 # an unconnected circle marker, actual outturn as the bold coloured line.
-# =============================================================================
 
 library(ggplot2)
 library(tidyr)

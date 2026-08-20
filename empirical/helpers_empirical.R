@@ -2,11 +2,10 @@
 #
 # Shared Winkler/MC-integration/EWMA helpers, used by empirical_spf_gdp.R
 # and ewma_delta_sensitivity.R.
-# =============================================================================
 
 # Winkler predictive mean/variance for a single Omega and forecasts f
-# (mirrors sim_generalizations_mse.R Part 1). Exact - avoids inverting
-# Omega back to Sigma.
+# (mirrors sim_generalizations_mse.R Part 1).
+
 winkler_predictive <- function(Omega, f) {
   ones     <- rep(1, nrow(Omega))
   eOe      <- as.numeric(t(ones) %*% Omega %*% ones)
@@ -15,7 +14,7 @@ winkler_predictive <- function(Omega, f) {
   return(list(mu = mu_tilde, sigma2 = sigma2))
 }
 
-# Gaussian log score: log p(y | mu, sigma^2)
+# Gaussian log score
 log_score_gaussian <- function(y, mu, sigma2) {
   dnorm(y, mean = mu, sd = sqrt(max(sigma2, 1e-10)), log = TRUE)
 }
@@ -25,9 +24,7 @@ log_sum_exp <- function(x) {
   m + log(sum(exp(x - m)))
 }
 
-# MC-integrated log score: average the predictive *densities* across draws
-# (Equation eq:mc_integration), not the parameters. log(mean(dens)) via
-# log-sum-exp for numerical stability.
+# MC-integrated log score: average the predictive densities across draws
 mc_log_score <- function(omega_list, f, y) {
   logdens <- sapply(omega_list, function(Om) {
     pred <- winkler_predictive(Om, f)
@@ -45,12 +42,12 @@ mc_sfe <- function(omega_list, f, y) {
   mean(sfe_per_draw)
 }
 
-# Gaussian PIT: F(y | mu, sigma^2), the plug-in predictive CDF.
+# Gaussian PIT
 pit_gaussian <- function(y, mu, sigma2) {
   pnorm(y, mean = mu, sd = sqrt(max(sigma2, 1e-10)))
 }
 
-# MC-integrated PIT: u_t = mean over draws of Phi(y | mu_m, sigma2_m).
+# MC-integrated PIT
 mc_pit <- function(omega_list, f, y) {
   cdf_per_draw <- sapply(omega_list, function(Om) {
     pred <- winkler_predictive(Om, f)
@@ -63,25 +60,24 @@ mc_pit <- function(omega_list, f, y) {
 # in empirical_spf_gdp.R's Cholesky/zero-pad step). Default 0.97.
 ewma_cov <- function(E, delta = 0.97, scale = nrow(E)) {
   R   <- nrow(E)
-  wts <- delta^((R - 1):0)       # older obs get less weight
+  wts <- delta^((R - 1):0)
   wts <- wts / sum(wts)
   (t(E) %*% diag(wts) %*% E) * scale
 }
 
-# Effective sample size under exponential decay: (sum w)^2 / sum(w^2).
-# Computed exactly, not via a large-R approximation.
+# Effective sample size under exponential decay
 effective_window <- function(delta, R) {
   wts <- delta^((R - 1):0)
   wts <- wts / sum(wts)
   1 / sum(wts^2)
 }
 
-# Half-life in quarters implied by delta (inverse of delta = 0.5^(1/h)).
+# Half-life in quarters implied by delta.
 half_life <- function(delta) {
   log(0.5) / log(delta)
 }
 
-# Inverse of half_life(): delta = 0.5^(1/h) for a target half-life h.
+# Inverse of half_life().
 delta_from_half_life <- function(h_quarters) {
   0.5^(1 / h_quarters)
 }
