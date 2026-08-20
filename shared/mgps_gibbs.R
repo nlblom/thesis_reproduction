@@ -10,15 +10,14 @@
 # Cross-checked against infinitefactor::linearMGSP (C++ source).
 
 diagv <- function(v) {
-  # explicit diagonal-matrix constructor; avoids R's diag(x) special-casing
-  # a length-1 vector as an identity matrix of that size
+  # explicit diagonal-matrix constructor
   m <- matrix(0, length(v), length(v))
   diag(m) <- v
   m
 }
 
 update_psijh <- function(Lambda, tauh, df) {
-  # rate fix per header note above  
+  # rate fix per header note above
   p <- nrow(Lambda); k <- ncol(Lambda)
   matrix(rgamma(p * k, df / 2 + 0.5,
                 rate = df / 2 + sweep(Lambda^2, 2, tauh, "*") / 2),
@@ -27,7 +26,8 @@ update_psijh <- function(Lambda, tauh, df) {
 
 update_delta_tauh <- function(Lambda, psijh, delta, ad1, bd1, ad2, bd2) {
   p <- nrow(Lambda); k <- ncol(Lambda)
-  mat <- psijh * Lambda^2                   # no tauh scaling here -- matches source
+  # no tauh scaling here - matches source
+  mat <- psijh * Lambda^2
   tauh <- cumprod(delta)
 
   ad <- ad1 + 0.5 * p * k

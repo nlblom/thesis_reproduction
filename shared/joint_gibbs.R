@@ -18,15 +18,20 @@ source(here("shared", "mgps_gibbs.R"))
 
 update_lambda_joint <- function(eta, Y, Omega_eps, Plam) {
   p <- ncol(Y); k <- ncol(eta)
-  d <- as.vector(t(Plam))                              # prior precision, row-block order
-  Q <- diagv(d) + kronecker(Omega_eps, t(eta) %*% eta)  # pk x pk joint precision
-  B_mat <- t(eta) %*% Y %*% Omega_eps                   # k x p
-  b <- as.vector(B_mat)                                 # column-blocks = row-blocks of v
+  # prior precision, row-block order
+  d <- as.vector(t(Plam))
+  # pk x pk joint precision
+  Q <- diagv(d) + kronecker(Omega_eps, t(eta) %*% eta)
+  B_mat <- t(eta) %*% Y %*% Omega_eps
+  # column-blocks = row-blocks of v
+  b <- as.vector(B_mat)
 
-  R <- chol(Q)                                          # upper triangular, R'R = Q
+  # upper triangular, R'R = Q
+  R <- chol(Q)
   mu <- backsolve(R, forwardsolve(t(R), b))
   draw <- mu + backsolve(R, rnorm(p * k))
-  t(matrix(draw, nrow = k, ncol = p))                   # column j of matrix = row j of Lambda
+  # column j of matrix = row j of Lambda
+  t(matrix(draw, nrow = k, ncol = p))
 }
 
 update_eta_joint <- function(Y, Lambda, Omega_eps) {
@@ -72,7 +77,8 @@ wang_glasso_sweep <- function(E, Sigma, Omega, lambdaPriora = 1, lambdaPriorb = 
     Sigma11 <- Sigma[idx, idx]
     Sigma12 <- Sigma[idx, i]
     Omega11inv <- Sigma11 - Sigma12 %*% t(Sigma12) / Sigma[i, i]
-    Ci <- (S[i, i] + lambda_gl) * Omega11inv + diagv(1 / tauI)   # bug fix: S[i,i], not S[1,1]
+    # bug fix: S[i,i], not S[1,1]
+    Ci <- (S[i, i] + lambda_gl) * Omega11inv + diagv(1 / tauI)
     CiChol <- chol(Ci)
     mui <- solve(-Ci, S[idx, i])
     beta <- mui + solve(CiChol, rnorm(p - 1))
@@ -90,7 +96,7 @@ wang_glasso_sweep <- function(E, Sigma, Omega, lambdaPriora = 1, lambdaPriorb = 
   list(Sigma = Sigma, Omega = Omega, lambda_gl = lambda_gl)
 }
 
-# -- assembled joint sampler -- #
+# Assembled joint sampler
 
 joint_gibbs <- function(Y, k_init,
                          nrun = 20000, burn = 5000, thin = 1,
@@ -101,7 +107,8 @@ joint_gibbs <- function(Y, k_init,
 
   n <- nrow(Y); p <- ncol(Y)
   sp <- (nrun - burn) / thin
-  stopifnot((nrun - burn) %% thin == 0)  # sp must come out whole
+  # sp must come out whole
+  stopifnot((nrun - burn) %% thin == 0)
   k <- k_init
 
   # initial values: Sigma = cov(X), Omega = ginv(Sigma) (matches blockGLasso).
@@ -117,9 +124,12 @@ joint_gibbs <- function(Y, k_init,
   tauh <- cumprod(delta)
   Plam <- sweep(psijh, 2, tauh, "*")
 
-  Omega_draws <- array(0, dim = c(p, p, sp))       # precision of y (Winkler's Omega)
-  Sigma_y_draws <- array(0, dim = c(p, p, sp))     # covariance of y = Lambda Lambda' + Sigma_eps
-  Sigma_eps_draws <- array(0, dim = c(p, p, sp))   # residual covariance only
+  # precision of y (Winkler's Omega)
+  Omega_draws <- array(0, dim = c(p, p, sp))
+  # covariance of y = Lambda Lambda' + Sigma_eps
+  Sigma_y_draws <- array(0, dim = c(p, p, sp))
+  # residual covariance only
+  Sigma_eps_draws <- array(0, dim = c(p, p, sp))
   k_trace <- integer(nrun + 1); k_trace[1] <- k
   save_idx <- 0
 
@@ -138,7 +148,7 @@ joint_gibbs <- function(Y, k_init,
 
     Plam <- sweep(psijh, 2, tauh, "*")
 
-    # -- adaptation: column birth/death (unchanged from mgps_gibbs.R) -- #
+    # Adaptation: column birth/death (unchanged from mgps_gibbs.R)
     prob <- 1 / exp(b0 + b1 * i)
     uu <- runif(1)
     lind <- colSums(abs(Lambda) < epsilon) / p
