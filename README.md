@@ -14,6 +14,7 @@ thesis_reproduction/
     raw/                        second_edit.csv, Actual_gdpgrowth_data_upd.xlsx
     yhat.csv, forERR.csv, ytrue.csv   (cleaned, ready to use)
     README_data_pipeline.txt    how to regenerate from raw ECB SPF data
+    spf_clean.R                 raw data -> yhat/forERR/ytrue.csv
   shared/
     joint_gibbs.R                BFGL joint Gibbs sampler
     mgps_gibbs.R                 shared helper functions
@@ -23,7 +24,6 @@ thesis_reproduction/
     check_burnin_diagnostics_sim.R     burn-in trace plots for the simulation grid
     results/
   empirical/
-    spf_clean.R                               raw data -> yhat/forERR/ytrue.csv
     helpers_empirical.R                       shared Winkler/MC-integration/EWMA functions
     empirical_spf_gdp.R                       Chapter 4 main empirical results
     ewma_delta_sensitivity.R                  Chapter 4 EWMA robustness check
@@ -45,7 +45,7 @@ Required packages: `MASS`, `MCMCpack`, `abglasso`, `BayesianGLasso`,
 
 ## Run order
 
-1. **`empirical/spf_clean.R`** - optional. Cleaned data is already in
+1. **`data/spf_clean.R`** - optional. Cleaned data is already in
    `data/`; only rerun this if regenerating from updated raw ECB SPF data
    (see `data/README_data_pipeline.txt`).
 2. **`simulation/sim_generalizations_mse.R`** - Chapter 3 simulation grid
