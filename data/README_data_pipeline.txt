@@ -1,5 +1,3 @@
-README.txt
-
 ECB SPF data for Chapter 4. Already cleaned; ready to use.
 
 - "yhat.csv": forecasts. "forERR.csv": forecast errors. "ytrue.csv": true
