@@ -1,15 +1,12 @@
-# =============================================================================
-# BURN-IN DIAGNOSTICS (SIMULATION GRID): one overlaid trace plot per method
-# =============================================================================
+# Burn-in diagnostics (simulation grid): one overlaid trace plot per method
+#
 # Checks whether burn_in_gl = 500 (Bayes GL, joint BFGL) and
-# burn_in_adaptive = 1000 (Adaptive GL) - set a priori in
-# sim_generalizations_mse.R by doubling for Adaptive GL's per-edge structure,
-# never actually verified against trace plots for this DGP - are adequate.
+# burn_in_adaptive = 1000 (Adaptive GL) are sufficient - set a priori in
+# sim_generalizations_mse.R by doubling for Adaptive GL's per-edge structure.
 #
 # Chains are extended well past both candidate burn-ins (to 3000 total
 # iterations) so we can see whether the trace has actually flattened by
 # 500/1000, not just whether it looks stable from that point onward.
-# =============================================================================
 
 library(MASS)
 library(BayesianGLasso)
@@ -19,12 +16,12 @@ library(here)
 source(here("shared", "mgps_gibbs.R"))
 source(here("shared", "joint_gibbs.R"))
 
-set.seed(20260803)  # arbitrary, fixed for reproducibility of this check
+# arbitrary, fixed for reproducibility of this check
+set.seed(20260803)
 
-# -----------------------------------------------------------------------
-# PART 1: DGP helpers (copied from sim_generalizations_mse.R Parts 2-3,
-# kept identical so the generated data matches the main grid exactly)
-# -----------------------------------------------------------------------
+# Part 1: DGP helpers
+# Copied from sim_generalizations_mse.R Parts 2-3, kept identical so the
+# generated data matches the main grid exactly
 
 make_block_sizes <- function(p, K) {
   set.seed(p * 100 + K)
@@ -50,19 +47,20 @@ make_block_sigma <- function(p, K, rho_within = 0.8, rho_across, block_sizes) {
   return(Sigma)
 }
 
-# -----------------------------------------------------------------------
-# PART 2: the two settings to check
-# -----------------------------------------------------------------------
+# Part 2: the two settings to check
 
 settings_to_check <- list(
   list(p = 20, K = 3, rho_across = 0.1, label = "p20_moderate"),
   list(p = 50, K = 3, rho_across = 0.3, label = "p50_dense")
 )
 
-T_obs        <- 100
-n_check      <- 3000   # total iterations, well past both candidate burn-ins
-entry_within <- c(1, 2)  # a within-block pair (both in block 1 by construction)
-entry_across <- NULL      # set per-setting below once block sizes are known
+T_obs <- 100
+# total iterations, well past both candidate burn-ins
+n_check <- 3000
+# a within-block pair (both in block 1 by construction)
+entry_within <- c(1, 2)
+# set per-setting below once block sizes are known
+entry_across <- NULL
 
 generate_data <- function(setting) {
   block_sizes <- make_block_sizes(setting$p, setting$K)
@@ -76,17 +74,16 @@ generate_data <- function(setting) {
   list(X = X, block_sizes = block_sizes, cross_idx = cross_idx)
 }
 
-# -----------------------------------------------------------------------
-# PART 3: run all three MCMC methods per setting, extract Omega[1,1],
-# Omega[1,2] (within-block) and Omega[1, cross_idx] (cross-block) traces
-# -----------------------------------------------------------------------
+# Part 3: run all three MCMC methods per setting
+# Extract Omega[1,1], Omega[1,2] (within-block) and Omega[1, cross_idx]
+# (cross-block) traces
 
 run_traces <- function(setting) {
   dat <- generate_data(setting)
   X   <- dat$X
   ci  <- dat$cross_idx
 
-  cat("\n=== Setting:", setting$label, "(p =", setting$p, ") ===\n")
+  cat("\nSetting:", setting$label, "(p =", setting$p, ")\n")
 
   # Bayesian GL
   gl_fit <- blockGLasso(X, iterations = n_check, burnIn = 0, verbose = FALSE)
@@ -118,10 +115,9 @@ run_traces <- function(setting) {
 
 results <- lapply(settings_to_check, run_traces)
 
-# -----------------------------------------------------------------------
-# PART 4: plot - one figure per method, overlaying both settings,
-# with vertical lines at the two candidate burn-ins (500, 1000)
-# -----------------------------------------------------------------------
+# Part 4: plot
+# One figure per method, overlaying both settings, with vertical lines at
+# the two candidate burn-ins (500, 1000)
 
 burn_in_gl       <- 500
 burn_in_adaptive <- 1000
@@ -149,5 +145,3 @@ plot_method_trace(results, "agl",  "Adaptive Bayesian GL", burn_in_adaptive)
 plot_method_trace(results, "bfgl", "Bayesian FGL (joint)", burn_in_gl)
 
 cat("\nSaved 3 diagnostic plots to simulation/results/burnin_trace_*.png\n")
-cat("Check by eye: has each trace visibly flattened by its burn-in line,\n")
-cat("in BOTH settings, especially the p50_dense one?\n")
